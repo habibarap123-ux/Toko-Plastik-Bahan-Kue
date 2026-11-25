@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Toko Plastik & Bahan Kue</title>
 <meta name="theme-color" content="#0d7a85">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Toko">
@@ -97,6 +99,7 @@ details[open]>summary{margin-bottom:6px}
 <body>
 <div class="wrap">
   <h1>Toko Plastik & Bahan Kue</h1>
+  <button class="pri" id="inst" hidden style="width:100%;margin-bottom:10px">Pasang sebagai aplikasi</button>
   <div class="tabs"><button class="tab on" data-v="vP">Produk</button><button class="tab" data-v="vK">Kasir</button><button class="tab" data-v="vR">Riwayat</button></div>
   <div id="vP">
   <div class="bar">
@@ -400,6 +403,13 @@ $('dhX').onclick=()=>$('dh').close();
 $('dhR').onclick=()=>{delete C[hIdx].hp;$('dh').close();renderK()};
 $('dhS').onclick=()=>{const v=$('dhV').value;if(v==='')return;C[hIdx].hp=int(v);$('dh').close();renderK()};
 $('mode').onclick=e=>{const b=e.target.closest('button');if(!b)return;MODE=b.dataset.mode;renderK()};
+
+/* Pasang sebagai aplikasi + offline */
+let dip=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();dip=e;$('inst').hidden=false});
+$('inst').onclick=async()=>{if(!dip)return;dip.prompt();try{await dip.userChoice}catch(e){}dip=null;$('inst').hidden=true};
+addEventListener('appinstalled',()=>{$('inst').hidden=true;toast('Aplikasi terpasang')});
+if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(()=>{});
 
 /* Mode tanpa stok */
 if(!STOK){['f_stok','f_min'].forEach(i=>$(i).parentElement.hidden=true);$('sort').querySelector('option[value=low]').hidden=true}
