@@ -148,8 +148,9 @@ button.del{border-color:var(--bad)}
 </dialog>
 
 <dialog id="di">
-  <b>Impor / cadangan</b>
-  <p class="meta">Tempel data dari Excel atau Google Sheets, atau pilih file CSV. Kolom berurutan: kode, nama, kategori, harga. Kolom harga berisi ukuran:harga dipisah tanda |, contoh: 1 kg:10000|1/2 kg:5500|1/4 kg:3000. Produk dengan kode yang sama akan diperbarui.</p>
+  <b>Tambah banyak produk sekaligus</b>
+  <p class="meta"><b>Cara cepat:</b> tempel daftar, satu baris satu produk, format <i>Nama = ukuran harga, ukuran harga</i>. Contoh: Terigu Tulip = 1 kg 10000, 1/2 kg 5500, 1/4 kg 3000. Kategori ditebak otomatis. Nama yang sudah ada akan diperbarui harganya.</p>
+  <p class="meta"><b>Dari Excel atau CSV:</b> tempel data atau pilih file. Kolom berurutan: kode, nama, kategori, harga. Kolom harga berisi ukuran:harga dipisah tanda |, contoh: 1 kg:10000|1/2 kg:5500|1/4 kg:3000. Produk dengan kode yang sama akan diperbarui.</p>
   <input type="file" id="file" accept=".csv,.tsv,.txt" style="width:100%;margin-bottom:8px">
   <textarea id="ta" placeholder="Tempel data di sini"></textarea>
   <div class="row">
@@ -182,7 +183,7 @@ function fmt(el){ /* beri titik ribuan saat mengetik, posisi kursor dijaga */
   const out=fm(raw);el.value=out;let n=0,i=0;for(;i<out.length&&n<d;i++){if(/\d/.test(out[i]))n++}
   try{el.setSelectionRange(i,i)}catch(e){}
 }
-const AK=[['Tepung',/tepung|terigu|maizena|tapioka|sagu|panir|tulip|payung|cakra|segitiga/],['Sterofom',/sterofom|styrofoam|stereofoam|stirofom/],['Cup dan sedotan',/\bcup\b|gelas|sedotan|tutup|\blid\b/],['Mika dan box',/mika|\bbox\b|\bdus\b|kotak|karton|alas/],['Plastik',/plastik|kresek|\bpp\b|hdpe|\bopp\b|klip|zipper|\bpe\b/],['Alat kue',/loyang|cetakan|spatula|mixer|whisk|kuas|piping|spuit|oven|saringan/],['Bahan kue',/gula|coklat|cokelat|ragi|baking|pewarna|essence|pasta|mentega|margarin|susu|vanili|selai|meses|ovalet|cmc|garam|telur|minyak/]];
+const AK=[['Tepung',/tepung|terigu|maizena|tapioka|sagu|panir|tulip|payung|cakra|segitiga/],['Sterofom',/sterofom|styrofoam|stereofoam|stirofom/],['Cup dan sedotan',/\bcup\b|gelas|sedotan|tutup|\blid\b/],['Mika dan box',/mika|\bbox\b|\bdus\b|kotak|karton|alas/],['Plastik',/plastik|kresek|\bpp\b|hdpe|\bopp\b|klip|zipper|\bpe\b/],['Alat kue',/loyang|cetakan|spatula|mixer|whisk|kuas|piping|spuit|oven|saringan/],['Bahan kue',/soda|powder|vanil|perisa|gula|coklat|cokelat|ragi|baking|pewarna|essence|pasta|mentega|margarin|susu|vanili|selai|meses|ovalet|cmc|garam|telur|minyak/]];
 function autoKat(n){n=String(n||'').toLowerCase();for(const [k,re] of AK)if(re.test(n))return k;return 'Lainnya'}
 const katOrd=(a,b)=>a===b?0:a==='Lainnya'?1:b==='Lainnya'?-1:a.localeCompare(b);
 const int=v=>parseInt(String(v||'').replace(/[^\d]/g,''))||0;
@@ -270,7 +271,19 @@ function parseCSV(t){
   r.push(c);rows.push(r);return rows.filter(x=>x.some(v=>v.trim()));
 }
 function parseH(s){return String(s||'').split('|').map(x=>{const i=x.lastIndexOf(':');return i<0?null:{n:x.slice(0,i).trim(),h:int(x.slice(i+1))}}).filter(r=>r&&r.n&&r.h>0)}
+function importSimple(text){ /* satu baris satu produk: Nama = ukuran harga, ukuran harga */
+  let add=0,upd=0,skip=0;
+  text.split(/\r?\n/).forEach(line=>{line=line.trim();if(!line)return;
+    const i=line.indexOf('=');if(i<1){skip++;return}
+    const nama=line.slice(0,i).trim();
+    const h=line.slice(i+1).split(/[,;|]/).map(x=>{const m=x.trim().match(/^(.*?)[\s:=]*([\d.]+)$/);return m&&m[1].trim()&&int(m[2])>0?{n:m[1].trim(),h:int(m[2])}:null}).filter(Boolean);
+    if(!nama||!h.length){skip++;return}
+    const ex=P.find(x=>x.nama.toLowerCase()===nama.toLowerCase());
+    if(ex){ex.h=h;upd++}else{P.push({id:uid(),kode:'',nama,kat:autoKat(nama),h});add++}});
+  save();render();toast(add+' produk baru, '+upd+' diperbarui'+(skip?', '+skip+' baris dilewati':''));
+}
 function doImport(text){
+  if(/^[^=\n]+=.+$/m.test(text))return importSimple(text);
   const rows=parseCSV(text);if(!rows.length)return toast('Tidak ada data untuk diimpor');
   if(/^(kode|nama)$/i.test(rows[0][0].trim()))rows.shift();
   let add=0,upd=0;
@@ -307,6 +320,7 @@ $('exp').onclick=()=>$('ta').value=exportText();
 $('cp').onclick=async()=>{const ta=$('ta');ta.select();try{await navigator.clipboard.writeText(ta.value);toast('Tersalin')}catch(e){toast('Teks sudah terpilih, salin manual')}};
 $('file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>$('ta').value=r.result;r.readAsText(f)};
 $('q').oninput=()=>{shown=60;render()};
+$('ta').placeholder='Contoh:\nTerigu Tulip = 1 kg 10000, 1/2 kg 5500, 1/4 kg 3000\nKerupuk Merah = 1 bungkus 6000, 4 bungkus 22500';
 
 /* Kasir: baris keranjang = {pid, u (nomor baris harga), q, hp (harga ubahan, opsional)} */
 const rowOf=l=>{const p=P.find(x=>x.id===l.pid);return p&&p.h[l.u]?{p,r:p.h[l.u]}:null};
